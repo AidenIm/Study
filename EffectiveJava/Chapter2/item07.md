@@ -54,4 +54,32 @@ OuputStream이나 InputStream의 close나 java.util.Timer의 cancel이 이런 �
 #### 7.4.1 종료자 연결(finalizer chaining)은 자동으로 이루어지지 않는다.
 만일 (Object가 아닌) 클래스가 종료자를 가지고 있고 하위 클래스가 해당 메서드를 재정의 한다면 하위 클래스의 종료자는 상위 클래스의 종료자를 명시적으로 호출 해야 한다.
 ``` java
+@Override protected void finalize() throws Thowable
+{
+	try
+	{
+		//...
+	}
+	finally
+	{
+		super.finalize();
+	}
+}
 ```
+이처럼 하위 클래스에서 상위 클래스 종료자를 재정의(override)하면서 상위 클래스 종료자 호출을 잊으면, 상위 클래스 종료자는 절대로 호출되지 않는데 이런 문제를 방지하기 위한 한가지 방법은 클래스 내부에 종료 보호자(finalizer guardian)을 만드는 것이다.
+
+```java
+public class Foo
+{
+	private final Object finalizerGuardian = new Object()
+	{
+		@Override protected void finalize() throws Throwable
+		{
+			//...
+			// 바깥 Foo 객체를 종료 시킴
+		}
+	}
+}
+```
+
+종료 보호자를 참조하는 finalizerGuardian 필드가 private이기 때문에 외부 객체(Foo)에 대한 참조가 모두 사라지는 순간 finalizerGuardian의 finalizer가 호출된다.
