@@ -111,12 +111,163 @@ public class Point
 ```
 
 ```java
-pu
+public class ColorPoint extends Point
+{
+	private final Color color;
+	
+	public ColorPoint(int x, int y, Color color)
+	{
+		super(x, y);
+		this.color = color;
+	}
+}
 ```
+ColorPoint 클래스의 equals는 어떻게 구현해야 하나?
+재정의 하지 않는다면 Point 클래스의 equals가 그래도 상속되므로 생각 정보가 비교되지 않을 것이다. equals의 규약을 어기는 것은 아니지만 바람직하지 않다. 
+<br/>
+만약 equals를 아래와 같이 정의 했다고 해보자.
+```java
+@Override public boolean equals(Object o)
+{
+	if(! (o instanceof ColorPoint)
+	{
+		return false;
+	}
+		
+	return super.equals(o) && ((ColorPoint) o).color == color;
+}
+```
+이 경우 Point, ColorPoint 사이의 대칭성이 위반된다.
+```java
+ColorPoint p1 = new ColorPoint(1, 2, Color.RED);
+Point p2 = new Point(1, 2);
+
+// p1.equals(p2) : false
+// p2.equals(p1) : true
+```
+그럼 Point와 비교할 때는 생상정보를 무시하게 하면 어떨까?
+
+```java
+@Override public boolean equals(Object o)
+{
+	if(! (o instanceof Point)
+	{
+		return false;
+	}
+	
+	if(! (o instanceof ColorPoint)
+	{
+		return o.equals(this);
+	}
+		
+	return super.equals(o) && ((ColorPoint) o).color == color;
+}
+```
+이 경우에는 대칭성이 보장되지만 추이성이 위반된다.
+```java
+ColorPoint p1 = new ColorPoint(1, 2, Color.RED);
+Point p2 = new Point(1, 2);
+ColorPoint p3 = new ColorPoint(1, 2, Color.BLUE);
+
+// p1.equals(p2) : true
+// p2.equals(p3) : true
+// p1.equals(p3) : false
+```
+
+그럼 이 문제의 해결책은 무엇일까?
+이 문제는 객체 지향 언어에서 동치 관계(equivalence relation)를 구현할 때 발생하는 본질적인 문제로 객체 추상화의 혜택을 누리는 이상
+**객체 생성 가능(instantiable) 클래스를 계승하여 새로운 값 컴포넌트를 추가하면서 equals 규약을 어기지 않을 방법은 없다.**
+<br/>
+equals 메서드를 구현할 때 instanceof 대신 getClass 메서드를 사용하면 기존 클래스를 확장하여 새로운 값 컴포넌트를 추가해도 
+equals 규약을 준수할 수 있다는 말이 있긴 하지만 이렇게 구현하면 **리스코프 대체 원칙**을 위반하므로 올바르지 않다. 
+> **리스코프 대체 원칙 (Liskov subsitution principle)**
+> 어떤 자료형의 중요한 속성(property)는 하위 자료형애도 그대로 유지되어서 그 자료형을 위한 메서드는 하위 자료형에서도 잘 동작해야 한다.
+```java
+// 리스코프 대체 원칙 위반
+// Point 객체와 equals를 활용하는 함수에서 올바르게 동작하지 않는다.
+// ex. List<Point>.Contains()
+@Override public boolean equals(Object o)
+{
+	if( o == null || o.getClass() == getClass())
+	{
+		return false;
+	}
+	
+	Point p = (Point) o;
+	return p.x == x && p.y == y;
+}
+```
+
+이 문제 해결을 위해서는 Point 클래스를 상속하지 않고 ColorPonit의 priavet 필드로 만들어 사용하는 방법을 사용할 수 있다. 
+
+```java
+public class ColorPoint
+{
+	private final Point point;
+	private final Color color;
+	
+	public ColorPoint(int x, int y, Color color)
+	{
+		if(color == null)
+		{
+			throw new NullPointerException();
+		}
+		Point = new Point(x, y);
+		this.color = color;
+	}
+	
+	public Point asPoint()
+	{
+		return point;
+	}
+	
+	@Override public boolean equals(Object o)
+	{
+		if(!(o instanceof ColorPoint))
+		{
+			return false;
+		}
+		
+		ColorPoint cp = (ColorPoint) o;
+		return cp.point.equals(point) && cp.color.equals(color);
+	}
+}
+```
+
+상위 클래스가 abstract 라면 상위 객체를 직접 만들 수 없으므로 equals규약을 어기지 않고도 값 필드를 추가할 수 있다.
+
 #### 8.4.4 일관성(consistent)
 > null이 아닌 참조 x와 y가 있을 때, equals를 통해 비교되는 정보에 아무 변화가 없다면, x.equals(y) 호출 결과는 호출 횟수에 상관 없이 항상 같아야 한다.
+
+변경 불가능한 객체들간의 동치 관계는 시간이 지나도 달라지지 않아야 한다. 
+그리고 **신뢰성이 보장되지 않는 자원(unreliable resource)들을 비교하는 equals를 구현하는 것은 삼가라.**
+예를 들어 java.net.URL의 equals 메서드는 URL에 대응하는 IP주소를 비교하는데 URL을 IP주소로 변경할 때 네트워크에 접속해야 하므로 언제나 같은 결과가 나온다고 보장할 수 없다. 
+극히 드문 몇 가지 경우를 제외하면 equals 메서드는 메모리에 존재하는 객체들만을 사용해 결정정(deterministic) 게산을 수행하도록 구현돼야 한다.
+
 #### 8.4.5 null 아닌 참조 x에 대해서, x.equals(null)은 항상 false이다.
+아래와 같은 코드가 있다고 했을 때 인자로 넘어온 객체 o가 null 인 경우를 구분해야 할 것 같지만 instanceof에서 o가 null 인경우 false를 리턴하게 되기 때문에 별도의 처리를 하지 않아도 된다.
+```java
+@Override public boolean equals(Object o)
+{
+	if( !(o instanceof MyType))
+	{
+		return false;
+	}
 	
+	//...
+}
+```
+
+### 8.5 정리
+#### 8.5.1 연산자를 사용하여 equals의 인자가 자기 자신인지 검사하라
+#### 8.5.2 instanceof 연산자를 사용하여 인자의 자료형이 정확한지 검사하라.
+#### 8.5.3 equals의 인자를 정확한 자료형으로 반환하라
+#### 8.5.4 "중요" 필드 각각이 인자로 주어진 객체의 해당 필드와 일치하는지 검사한다.
+#### 8.5.5 equals 메서드 구현을 끝냈다면, 대칭성, 추이성, 일관성의 세 속성이 만족되는지 검토하라.
+#### 8.5.6 기타
+- equals를 구현할 때는 hashCode도 재정의 하라
+- 너무 머리 쓰지마라
+- equals 메서드의 인자형을 object에서 다른 것으로 바꾸지 마라.
 
 	
 	
