@@ -1,4 +1,4 @@
-##9 equals를 재정의할 때는 반드시 hashCode도 재정의 하라
+## 9 equals를 재정의할 때는 반드시 hashCode도 재정의 하라
 <br/>
 Object 클래스 명세에서 복사해 온 일반 규약은 아래와 같다.
 
